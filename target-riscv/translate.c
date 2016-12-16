@@ -1280,7 +1280,86 @@ static void gen_system(DisasContext *ctx, uint32_t opc,
     tcg_temp_free(imm_rs1);
 }
 
-static void decode_opc(CPURISCVState *env, DisasContext *ctx)
+static void decode_C0(DisasContext *ctx)
+{
+
+}
+
+static void decode_C1(DisasContext *ctx)
+{
+
+}
+
+static void decode_C2(DisasContext *ctx)
+{
+    uint8_t funct3 = extract32(ctx->opcode, 13, 2);
+    uint8_t rd = extract32(ctx->opcode, 7, 11);
+    uint8_t rs2 = extract32(ctx->opcode, 2, 5);
+    uint16_t imm = (rs2 << 1) | extract32(ctx->opcode, 12, 1);
+
+    switch (funct3) {
+    case 0: /* C.SLLI -> slli rd, rd, shamt[5:0]
+               C.SLLI64 -> */
+        break;
+    case 1: /* C.FLDSP(RV32/64DC) -> fld rd, offset[8:3](x2) */
+        break;
+    case 2: /* C.LWSP */
+        break;
+    case 3:
+#if defined(TARGET_RISCV64)
+        /* C.LDSP(RVC64) -> ld rd, offset[8:3](x2) */
+#else
+        /* C.FLWSP(RV32FC) -> flw rd, offset[7:2](x2) */
+#endif
+        break;
+    case 4:
+        switch (imm) {
+        case 0: /* C.JR -> jalr x0, rs1, 0*/
+            break;
+        case 1 ... 15: /* C.MV -> add rd, x0, rs2 */
+            break;
+        case 16:
+            if (rd == 0) { /* C.EBREAK -> ebreak*/
+            } else { /* C.JALR -> jalr x1, rs1, 0*/
+            }
+            break;
+        case 17 ... 31: /* C.ADD -> add rd, rd, rs2*/
+            break;
+        }
+        break;
+    case 5:
+        /* C.FSDSP -> fsd rs2, offset[8:3](x2)*/
+        /* C.SQSP */
+        break;
+    case 6: /* C.SWSP */
+        break;
+    case 7:
+        /* C.FSWSP(RV32) */
+        /* C.SDSP(Rv64/128) */
+        break;
+    }
+}
+
+static void decode_RVC32_64(CPURISCVState *env, DisasContext *ctx)
+{
+
+    uint8_t op = extract32(ctx->opcode, 0, 2);
+
+    switch (op) {
+    case 0:
+        decode_C0(ctx);
+        break;
+    case 1:
+        decode_C1(ctx);
+        break;
+    case 2:
+        decode_C2(ctx);
+        break;
+    }
+
+}
+
+static void decode_RV32_64(CPURISCVState *env, DisasContext *ctx)
 {
     int rs1;
     int rs2;
@@ -1293,6 +1372,7 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx)
      * misaligned at this point. Instructions that set PC must do the check,
      * since epc must be the address of the instruction that caused us to
      * perform the misaligned instruction fetch */
+
 
     op = MASK_OP_MAJOR(ctx->opcode);
     rs1 = GET_RS1(ctx->opcode);
@@ -1409,6 +1489,16 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx)
     default:
         kill_unknown(ctx, RISCV_EXCP_ILLEGAL_INST);
         break;
+    }
+}
+
+static void decode_opc(CPURISCVState *env, DisasContext *ctx)
+{
+    /* check for compressed insn */
+    if (extract32(ctx->opcode, 0, 2) != 3) {
+        decode_RVC32_64(env, ctx);
+    } else {
+        decode_RV32_64(env, ctx);
     }
 }
 
