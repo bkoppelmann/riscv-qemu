@@ -1292,50 +1292,78 @@ static void decode_C1(DisasContext *ctx)
 
 static void decode_C2(DisasContext *ctx)
 {
+    uint8_t zimm, rd, rs2;
     uint8_t funct3 = extract32(ctx->opcode, 13, 2);
-    uint8_t rd = extract32(ctx->opcode, 7, 11);
-    uint8_t rs2 = extract32(ctx->opcode, 2, 5);
-    uint16_t imm = (rs2 << 1) | extract32(ctx->opcode, 12, 1);
+
+    TCGv source1 = tcg_temp_new();
+
+    rd = GET_RD(ctx->opcode);
+    gen_get_gpr(source1, rd);
 
     switch (funct3) {
     case 0: /* C.SLLI -> slli rd, rd, shamt[5:0]
                C.SLLI64 -> */
+        zimm = GET_C_ZIMM(ctx->opcode);
+        if (zimm < TARGET_LONG_BITS && rd != 0) {
+            tcg_gen_shli_tl(source1, source1, zimm);
+        } else {
+            kill_unknown(ctx, RISCV_EXCP_ILLEGAL_INST);
+        }
         break;
     case 1: /* C.FLDSP(RV32/64DC) -> fld rd, offset[8:3](x2) */
+        gen_fp_load(ctx, OPC_RISC_FLD, rd, 2, GET_C_LDSP_IMM(ctx->opcode));
         break;
     case 2: /* C.LWSP */
+        gen_load(ctx, OPC_RISC_LW, rd, 2, GET_C_LWSP_IMM(ctx->opcode));
         break;
     case 3:
 #if defined(TARGET_RISCV64)
         /* C.LDSP(RVC64) -> ld rd, offset[8:3](x2) */
+        gen_load(ctx, OPC_RISC_LW, rd, 2, GET_C_LDSP_IMM(ctx->opcode));
 #else
         /* C.FLWSP(RV32FC) -> flw rd, offset[7:2](x2) */
+        gen_fp_load(ctx, OPC_RISC_FLW, rd, 2, GET_C_LWSP_IMM(ctx->opcode));
 #endif
         break;
     case 4:
-        switch (imm) {
+        rs2 = GET_C_RS2(ctx->opcode);
+        zimm = rs2 | (extract32(ctx->opcode, 12, 1) << 5);
+        switch (zimm) {
         case 0: /* C.JR -> jalr x0, rs1, 0*/
+            gen_jalr(ctx, OPC_RISC_JALR, 0, rd, 0);
             break;
         case 1 ... 15: /* C.MV -> add rd, x0, rs2 */
+            gen_arith(ctx, OPC_RISC_ADD, rd, 0, rs2);
             break;
         case 16:
             if (rd == 0) { /* C.EBREAK -> ebreak*/
+              gen_system(ctx, OPC_RISC_ECALL, 0, 0, 0x1);
             } else { /* C.JALR -> jalr x1, rs1, 0*/
+                gen_jalr(ctx, OPC_RISC_JALR, 1, rd, 0);
             }
             break;
         case 17 ... 31: /* C.ADD -> add rd, rd, rs2*/
+            gen_arith(ctx, OPC_RISC_ADD, rd, rd, rs2);
             break;
         }
         break;
     case 5:
         /* C.FSDSP -> fsd rs2, offset[8:3](x2)*/
+        gen_fp_store(ctx, OPC_RISC_FSD, GET_C_RS2(ctx->opcode), 2,
+                     GET_C_SDSP_IMM(ctx->opcode));
         /* C.SQSP */
         break;
-    case 6: /* C.SWSP */
+    case 6: /* C.SWSP -> sw rs2, offset[7:2](x2)*/
+        gen_store(ctx, OPC_RISC_SW, rd, 2, GET_C_SWSP_IMM(ctx->opcode));
         break;
     case 7:
-        /* C.FSWSP(RV32) */
-        /* C.SDSP(Rv64/128) */
+#if defined(TARGET_RISCV64)
+        /* C.FSWSP(RV32) -> fsw rs2, offset[7:2](x2) */
+        gen_fp_store(ctx, OPC_RISC_FSW, rd, 2, GET_C_SWSP_IMM(ctx->opcode));
+#else
+        /* C.SDSP(Rv64/128) -> sd rs2, offset[8:3](x2)*/
+        gen_store(ctx, OPC_RISC_SW, rd, 2, GET_C_SDSP_IMM(ctx->opcode));
+#endif
         break;
     }
 }
