@@ -1344,6 +1344,75 @@ static void decode_C0(DisasContext *ctx)
 
 static void decode_C1(DisasContext *ctx)
 {
+    uint8_t funct3 = extract32(ctx->opcode, 13, 3);
+    uint8_t rd_rs1 = GET_C_RS1(ctx->opcode);
+    uint8_t funct2;
+
+    switch (funct3) {
+    case 0:
+        /* C.ADDI -> addi rd, rd, nzimm[5:0] */
+        gen_arith_imm(ctx, OPC_RISC_ADDI, rd_rs1, rd_rs1,
+                      GET_C_IMM(ctx->opcode));
+        break;
+    case 1:
+#if defined(TARGET_RISCV64)
+        /* C.ADDIW (RV64/128) -> addiw rd, rd, imm[5:0]*/
+        gen_arith_imm(ctx, OPC_RISC_ADDIW, rd_rs1, rd_rs1,
+                      GET_C_IMM(ctx->opcode));
+#else
+        /* C.JAL(RV32) -> jal x1, offset[11:1] */
+
+#endif
+        break;
+    case 2:
+        /* C.LI -> addi rd, x0, imm[5:0]*/
+        break;
+    case 3:
+        /* C.ADDI16SP -> addi x2, x2, nzimm[9:4]*/
+        /* C.LUI (rs1/rd =/= {0,2}) -> lui rd, nzimm[17:12]*/
+        break;
+    case 4:
+        funct2 = extract32(ctx->opcode, 10, 2);
+        switch (funct2) {
+        case 0: /* C.SRLI(RV32) */
+                /* C.SRLI64(RV128) */
+            break;
+        case 1:
+            /* C.SRAI */
+            /* C.SRAI64 */
+            break;
+        case 2:
+            /* C.ANDI */
+            break;
+        case 3:
+            funct2 = extract32(ctx->opcode, 5, 2);
+            switch (funct2) {
+            case 0:
+                /* C.SUB */
+                break;
+            case 1:
+                /* C.XOR */
+                break;
+            case 2:
+                /* C.OR */
+                break;
+            case 3:
+                /* C.AND */
+                break;
+            }
+            break;
+        }
+        break;
+    case 5:
+        /* C.J */
+        break;
+    case 6:
+        /* C.BEQZ */
+        break;
+    case 7:
+        /* C.BNEZ */
+        break;
+    }
 }
 
 static void decode_C2(DisasContext *ctx)
