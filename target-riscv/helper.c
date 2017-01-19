@@ -27,7 +27,7 @@
 #include <signal.h>
 #include "cpu.h"
 
-/*#define RISCV_DEBUG_INTERRUPT */
+#define RISCV_DEBUG_INTERRUPT
 
 bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
@@ -316,7 +316,7 @@ int riscv_cpu_handle_mmu_fault(CPUState *cs, vaddr address,
     return ret;
 }
 
-#ifdef RISCV_DEBUG_INTERRUPT
+#if defined(RISCV_DEBUG_INTERRUPT) && !defined(CONFIG_USER_ONLY)
 static const char * const riscv_excp_names[12] = {
     "misaligned fetch",
     "fault fetch",

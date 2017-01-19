@@ -24,6 +24,11 @@
 #include "qemu-common.h"
 #include "migration/vmstate.h"
 
+static inline void set_feature(CPURISCVState *env, int feature)
+{
+    env->features |= 1ULL << feature;
+}
+
 static void riscv_cpu_set_pc(CPUState *cs, vaddr value)
 {
     RISCVCPU *cpu = RISCV_CPU(cs);

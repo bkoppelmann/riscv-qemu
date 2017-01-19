@@ -115,6 +115,9 @@ struct CPURISCVState {
 
     float_status fp_status;
 
+    /* Internal CPU feature flags.  */
+    uint64_t features;
+
     /* QEMU */
     CPU_COMMON
 
@@ -168,6 +171,17 @@ static inline RISCVCPU *riscv_env_get_cpu(CPURISCVState *env)
 {
     return container_of(env, RISCVCPU, env);
 }
+
+enum riscv_features {
+    RISCV_FEATURE_RVC,
+    RISCV_FEATURE_RVM,
+};
+
+static inline int riscv_feature(CPURISCVState *env, int feature)
+{
+    return (env->features & (1ULL << feature)) != 0;
+}
+
 
 #include "cpu_user.h"
 #include "cpu_bits.h"

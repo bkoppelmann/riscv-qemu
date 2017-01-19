@@ -45,6 +45,7 @@ static TCGv_i32 cpu_amoinsn;
 typedef struct DisasContext {
     struct TranslationBlock *tb;
     target_ulong pc;
+    target_ulong next_pc;
     uint32_t opcode;
     int singlestep_enabled;
     int mem_idx;
@@ -228,6 +229,11 @@ static void gen_arith(DisasContext *ctx, uint32_t opc, int rd, int rs1,
         int rs2)
 {
     TCGv source1, source2, cond1, cond2, zeroreg, resultopt1;
+
+    if (rd == 0) {
+        return; /* NOP */
+    }
+
     source1 = tcg_temp_new();
     source2 = tcg_temp_new();
     gen_get_gpr(source1, rs1);
@@ -441,6 +447,9 @@ static void gen_arith_imm(DisasContext *ctx, uint32_t opc, int rd,
     gen_get_gpr(source1, rs1);
     target_long extra_shamt = 0;
 
+    if (rd == 0) {
+        return; /* NOP */
+    }
     switch (opc) {
     case OPC_RISC_ADDI:
 #if defined(TARGET_RISCV64)
@@ -514,8 +523,29 @@ static void gen_arith_imm(DisasContext *ctx, uint32_t opc, int rd,
     tcg_temp_free(source1);
 }
 
-static void gen_jalr(DisasContext *ctx, uint32_t opc, int rd, int rs1,
-        target_long imm)
+static void gen_jal(CPURISCVState *env, DisasContext *ctx, int rd,
+                    target_ulong imm)
+{
+    target_ulong next_pc;
+
+    /* check misaligned: */
+    next_pc = ctx->pc + imm;
+    if (!riscv_feature(env, RISCV_FEATURE_RVC)) {
+        if ((next_pc & 0x1) != 0) {
+            generate_exception_mbadaddr(ctx, RISCV_EXCP_INST_ADDR_MIS);
+        }
+    }
+    if (rd != 0) {
+        tcg_gen_movi_tl(cpu_gpr[rd], ctx->next_pc);
+    }
+
+    gen_goto_tb(ctx, 0, ctx->pc + imm); /* must use this for safety */
+    ctx->bstate = BS_BRANCH;
+
+}
+
+static void gen_jalr(CPURISCVState *env, DisasContext *ctx, uint32_t opc,
+                     int rd, int rs1, target_long imm)
 {
     /* no chaining with JALR */
     TCGLabel *misaligned = gen_new_label();
@@ -527,11 +557,13 @@ static void gen_jalr(DisasContext *ctx, uint32_t opc, int rd, int rs1,
         gen_get_gpr(cpu_pc, rs1);
         tcg_gen_addi_tl(cpu_pc, cpu_pc, imm);
         tcg_gen_andi_tl(cpu_pc, cpu_pc, (target_ulong)-2);
-        tcg_gen_andi_tl(t0, cpu_pc, 0x2);
-        tcg_gen_brcondi_tl(TCG_COND_NE, t0, 0x0, misaligned);
 
+        if (!riscv_feature(env, RISCV_FEATURE_RVC)) {
+            tcg_gen_andi_tl(t0, cpu_pc, 0x2);
+            tcg_gen_brcondi_tl(TCG_COND_NE, t0, 0x0, misaligned);
+        }
         if (rd != 0) {
-            tcg_gen_movi_tl(cpu_gpr[rd], ctx->pc + 4);
+            tcg_gen_movi_tl(cpu_gpr[rd], ctx->next_pc);
         }
         tcg_gen_exit_tb(0);
 
@@ -581,9 +613,9 @@ static void gen_branch(DisasContext *ctx, uint32_t opc, int rs1, int rs2,
         break;
     }
 
-    gen_goto_tb(ctx, 1, ctx->pc + 4);
+    gen_goto_tb(ctx, 1, ctx->next_pc);
     gen_set_label(l); /* branch taken */
-    if ((ctx->pc + bimm) & 0x3) {
+    if ((ctx->pc + bimm) & 0x1) {
         /* misaligned */
         generate_exception_mbadaddr(ctx, RISCV_EXCP_INST_ADDR_MIS);
         tcg_gen_exit_tb(0);
@@ -1268,7 +1300,7 @@ static void gen_system(DisasContext *ctx, uint32_t opc,
         }
         gen_set_gpr(rd, dest);
         /* end tb since we may be changing priv modes, to get mmu_index right */
-        tcg_gen_movi_tl(cpu_pc, ctx->pc + 4);
+        tcg_gen_movi_tl(cpu_pc, ctx->next_pc);
         tcg_gen_exit_tb(0); /* no chaining */
         ctx->bstate = BS_BRANCH;
         break;
@@ -1288,8 +1320,13 @@ static void decode_C0(DisasContext *ctx)
     switch (funct3) {
     case 0:
         /* illegal */
-        /* C.ADDI4SPN -> addi rd', x2, zimm[9:2]*/
-        gen_arith_imm(ctx, OPC_RISC_ADDI, rd_rs2, 2, GET_C_ZIMM(ctx->opcode));
+        if (ctx->opcode == 0) {
+            kill_unknown(ctx, RISCV_EXCP_ILLEGAL_INST);
+        } else {
+            /* C.ADDI4SPN -> addi rd', x2, zimm[9:2]*/
+            gen_arith_imm(ctx, OPC_RISC_ADDI, rd_rs2, 2,
+                          GET_C_ADDI4SPN_IMM(ctx->opcode));
+        }
         break;
     case 1:
         /* C.FLD -> fld rd', offset[7:3](rs1')*/
@@ -1342,7 +1379,7 @@ static void decode_C0(DisasContext *ctx)
     }
 }
 
-static void decode_C1(DisasContext *ctx)
+static void decode_C1(CPURISCVState *env, DisasContext *ctx)
 {
     uint8_t funct3 = extract32(ctx->opcode, 13, 3);
     uint8_t rd_rs1 = GET_C_RS1(ctx->opcode);
@@ -1361,7 +1398,7 @@ static void decode_C1(DisasContext *ctx)
                       GET_C_IMM(ctx->opcode));
 #else
         /* C.JAL(RV32) -> jal x1, offset[11:1] */
-
+        gen_jal(env, ctx, rd_rs1, GET_C_IMM(ctx->opcode));
 #endif
         break;
     case 2:
@@ -1415,7 +1452,7 @@ static void decode_C1(DisasContext *ctx)
     }
 }
 
-static void decode_C2(DisasContext *ctx)
+static void decode_C2(CPURISCVState *env, DisasContext *ctx)
 {
     uint8_t zimm, rd, rs2;
     uint8_t funct3 = extract32(ctx->opcode, 13, 3);
@@ -1455,7 +1492,7 @@ static void decode_C2(DisasContext *ctx)
         zimm = rs2 | (extract32(ctx->opcode, 12, 1) << 5);
         switch (zimm) {
         case 0: /* C.JR -> jalr x0, rs1, 0*/
-            gen_jalr(ctx, OPC_RISC_JALR, 0, rd, 0);
+            gen_jalr(env, ctx, OPC_RISC_JALR, 0, rd, 0);
             break;
         case 1 ... 15: /* C.MV -> add rd, x0, rs2 */
             gen_arith(ctx, OPC_RISC_ADD, rd, 0, rs2);
@@ -1464,7 +1501,7 @@ static void decode_C2(DisasContext *ctx)
             if (rd == 0) { /* C.EBREAK -> ebreak*/
               gen_system(ctx, OPC_RISC_ECALL, 0, 0, 0x1);
             } else { /* C.JALR -> jalr x1, rs1, 0*/
-                gen_jalr(ctx, OPC_RISC_JALR, 1, rd, 0);
+                gen_jalr(env, ctx, OPC_RISC_JALR, 1, rd, 0);
             }
             break;
         case 17 ... 31: /* C.ADD -> add rd, rd, rs2*/
@@ -1503,10 +1540,10 @@ static void decode_RVC32_64(CPURISCVState *env, DisasContext *ctx)
         decode_C0(ctx);
         break;
     case 1:
-        decode_C1(ctx);
+        decode_C1(env, ctx);
         break;
     case 2:
-        decode_C2(ctx);
+        decode_C2(env, ctx);
         break;
     }
 
@@ -1519,7 +1556,6 @@ static void decode_RV32_64(CPURISCVState *env, DisasContext *ctx)
     int rd;
     uint32_t op;
     target_long imm;
-    target_ulong next_pc;
 
     /* We do not do misaligned address check here: the address should never be
      * misaligned at this point. Instructions that set PC must do the check,
@@ -1549,21 +1585,10 @@ static void decode_RV32_64(CPURISCVState *env, DisasContext *ctx)
         break;
     case OPC_RISC_JAL:
         imm = GET_JAL_IMM(ctx->opcode);
-        /* check misaligned: */
-        next_pc = ctx->pc + imm;
-        if ((next_pc & 0x3) != 0) {
-            generate_exception_mbadaddr(ctx, RISCV_EXCP_INST_ADDR_MIS);
-        }
-
-        if (rd != 0) {
-            tcg_gen_movi_tl(cpu_gpr[rd], ctx->pc + 4);
-        }
-
-        gen_goto_tb(ctx, 0, ctx->pc + imm); /* must use this for safety */
-        ctx->bstate = BS_BRANCH;
+        gen_jal(env, ctx, rd, imm);
         break;
     case OPC_RISC_JALR:
-        gen_jalr(ctx, MASK_OP_JALR(ctx->opcode), rd, rs1, imm);
+        gen_jalr(env, ctx, MASK_OP_JALR(ctx->opcode), rd, rs1, imm);
         break;
     case OPC_RISC_BRANCH:
         gen_branch(ctx, MASK_OP_BRANCH(ctx->opcode), rs1, rs2,
@@ -1580,18 +1605,13 @@ static void decode_RV32_64(CPURISCVState *env, DisasContext *ctx)
 #if defined(TARGET_RISCV64)
     case OPC_RISC_ARITH_IMM_W:
 #endif
-        if (rd == 0) {
-            break; /* NOP */
-        }
+
         gen_arith_imm(ctx, MASK_OP_ARITH_IMM(ctx->opcode), rd, rs1, imm);
         break;
     case OPC_RISC_ARITH:
 #if defined(TARGET_RISCV64)
     case OPC_RISC_ARITH_W:
 #endif
-        if (rd == 0) {
-            break; /* NOP */
-        }
         gen_arith(ctx, MASK_OP_ARITH(ctx->opcode), rd, rs1, rs2);
         break;
     case OPC_RISC_FP_LOAD:
@@ -1629,7 +1649,7 @@ static void decode_RV32_64(CPURISCVState *env, DisasContext *ctx)
         /* standard fence is nop, fence_i flushes TB (like an icache): */
         if (ctx->opcode & 0x1000) { /* FENCE_I */
             gen_helper_fence_i(cpu_env);
-            tcg_gen_movi_tl(cpu_pc, ctx->pc + 4);
+            tcg_gen_movi_tl(cpu_pc, ctx->next_pc);
             tcg_gen_exit_tb(0); /* no chaining */
             ctx->bstate = BS_BRANCH;
         }
@@ -1649,8 +1669,10 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx)
 {
     /* check for compressed insn */
     if (extract32(ctx->opcode, 0, 2) != 3) {
+        ctx->next_pc = ctx->pc + 2;
         decode_RVC32_64(env, ctx);
     } else {
+        ctx->next_pc = ctx->pc + 4;
         decode_RV32_64(env, ctx);
     }
 }
@@ -1708,7 +1730,7 @@ void gen_intermediate_code(CPURISCVState *env, TranslationBlock *tb)
 
         ctx.opcode = cpu_ldl_code(env, ctx.pc);
         decode_opc(env, &ctx);
-        ctx.pc += 4;
+        ctx.pc = ctx.next_pc;
 
         if (cs->singlestep_enabled) {
             break;
