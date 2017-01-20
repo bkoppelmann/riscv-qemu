@@ -438,7 +438,7 @@ target_ulong helper_sret(CPURISCVState *env, target_ulong cpu_pc_deb)
     }
 
     target_ulong retpc = env->sepc;
-    if (retpc & 0x3) {
+    if (retpc & 0x1) {
         helper_raise_exception(env, RISCV_EXCP_INST_ADDR_MIS);
     }
 

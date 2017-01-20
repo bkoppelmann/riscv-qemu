@@ -92,7 +92,11 @@ static void riscv_cpu_reset(CPUState *s)
 static void riscv_cpu_realizefn(DeviceState *dev, Error **errp)
 {
     CPUState *cs = CPU(dev);
+    RISCVCPU *cpu = RISCV_CPU(dev);
     RISCVCPUClass *mcc = RISCV_CPU_GET_CLASS(dev);
+    CPURISCVState *env = &cpu->env;
+
+    set_feature(env, RISCV_FEATURE_RVC);
 
     cpu_reset(cs);
     qemu_init_vcpu(cs);
