@@ -339,7 +339,7 @@ enum {
                                     | (extract32(inst, 2, 1) << 5) \
                                     | (extract32(inst, 5, 1) << 6) \
                                     | (extract32(inst, 3, 2) << 7) \
-                                    | (extract32(inst, 12, 1) << 9)
+                                    | (sextract64(inst, 12, 1) << 9)
 #define GET_C_LWSP_IMM(inst)        (extract32(inst, 4, 3) << 2) \
                                     | (extract32(inst, 12, 1) << 5) \
                                     | (extract32(inst, 2, 2) << 6)
