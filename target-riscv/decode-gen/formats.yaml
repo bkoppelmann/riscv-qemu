@@ -1,0 +1,37 @@
+
+immediates:
+    - I: {data: [31s..25, 24..20                ], fill:}
+    - S: {data: [31s..25, 11..7                 ], fill:}
+    - B: {data: [31s, 7,  30..25, 11..8         ], fill: '0'}
+    - U: {data: [31..20, 19..12                 ], fill: '000000000000'}
+    - J: {data: [31s, 19..12, 20, 30..25, 24..21], fill: '0'}
+
+fields:
+    - rd: 11..7
+    - rs1: 19..15
+    - rs2: 24..20
+
+formats:
+    - R: {
+       fields: [rd, rs1, rs2]
+      }
+    - I: {
+       fields: [rd,rs1],
+       immediates: [I]
+      }
+    - S: {
+       fields: [rs1,rs2],
+       immediates: [S]
+      }
+    - SB: {
+       fields: [rs1,rs2],
+       immediates: [B]
+      }
+    - U: {
+       fields: [rd],
+       immediates: [U]
+      }
+    - UJ: {
+       fields: [rd],
+       immediates: [J]
+      }

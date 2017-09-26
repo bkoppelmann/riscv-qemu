@@ -1,0 +1,63 @@
+
+opcodes:
+    - OP1_32: 6..0
+    - FUNC3_32: 14..12
+    - FUNC7_32: 31..25
+    - FENCE2: 19..7
+    - FENCE3: 31..27
+    - FENCEI: 31..20
+
+instructions:
+    # RV32I
+    - LUI:    {format: U,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32:  55},                         func: gen_lui}
+    - AUIPC:  {format: U,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32:  23},                         func: gen_auipc}
+    - JAL:    {format: UJ, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 111},                         func: gen_jal}
+    - JALR:   {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 103, FUNC3_32: 0},            func: gen_jalr}
+    - BEQ:    {format: SB, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 99, FUNC3_32: 0},             func: gen_beq}
+    - BNE:    {format: SB, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 99,FUNC3_32: 1},              func: gen_bne}
+    - BLT:    {format: SB, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 99,FUNC3_32: 4},              func: gen_blt}
+    - BGE:    {format: SB, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 99,FUNC3_32: 5},              func: gen_bge}
+    - BLTU:   {format: SB, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 99,FUNC3_32: 6},              func: gen_bltu}
+    - BGEU:   {format: SB, ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 99,FUNC3_32: 7},              func: gen_bgeu}
+    - LB:     {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 3 ,FUNC3_32: 0},              func: gen_lb}
+    - LH:     {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 3 ,FUNC3_32: 1},              func: gen_lh}
+    - LW:     {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 3 ,FUNC3_32: 2},              func: gen_lw}
+    - LBU:    {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 3 ,FUNC3_32: 4},              func: gen_lbu}
+    - LHU:    {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 3 ,FUNC3_32: 5},              func: gen_lhu}
+    - SB:     {format: S,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 35,FUNC3_32: 0},              func: gen_sb}
+    - SH:     {format: S,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 35,FUNC3_32: 1},              func: gen_sh}
+    - SW:     {format: S,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 35,FUNC3_32: 2},              func: gen_sw}
+    - ADDI:   {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 0},              func: gen_addi}
+    - SLTI:   {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 2},              func: gen_slti}
+    - SLTIU:  {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 3},              func: gen_sltiu}
+    - XORI:   {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 4},              func: gen_xori}
+    - ORI:    {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 6},              func: gen_ori}
+    - ANDI:   {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 7},              func: gen_andi}
+    - SLLI:   {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 1,FUNC7_32: 0},  func: gen_slli}
+    - SRLI:   {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 5,FUNC7_32: 0},  func: gen_srli}
+    - SRAI:   {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 19,FUNC3_32: 5,FUNC7_32: 32}, func: gen_srai}
+    - ADD:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 0,FUNC7_32: 0},  func: gen_add}
+    - SUB:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 0,FUNC7_32: 32}, func: gen_sub}
+    - SLL:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 1,FUNC7_32: 0},  func: gen_sll}
+    - SLT:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 2,FUNC7_32: 0},  func: gen_slt}
+    - SLTU:   {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 3,FUNC7_32: 0},  func: gen_sltu}
+    - XOR:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 4,FUNC7_32: 0},  func: gen_xor}
+    - SRL:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 5,FUNC7_32: 0},  func: gen_srl}
+    - SRA:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 5,FUNC7_32: 32}, func: gen_sra}
+    - OR:     {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 6,FUNC7_32: 0},  func: gen_or}
+    - AND:    {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 51,FUNC3_32: 7,FUNC7_32: 0},  func: gen_and}
+    - FENCE:  {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 15,FENCE2: 0,FENCE3: 0},      func: gen_fence}
+    - FENCEI: {format: R,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 15,FENCE2: 32,FENCEI: 0},     func: gen_fence_i}
+    - ECALL:  {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115, FUNC3_32: 0, FENCEI: 0}, func: gen_ecall}
+    - EBREAK: {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115, FUNC3_32: 0, FENCEI: 1}, func: gen_ebreak}
+    - CSRRW:  {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115,FUNC3_32: 1},             func: gen_csrrw}
+    - CSRRS:  {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115,FUNC3_32: 2},             func: gen_csrrs}
+    - CSRRC:  {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115,FUNC3_32: 3},             func: gen_csrrc}
+    - CSRRWI: {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115,FUNC3_32: 5},             func: gen_csrrwi}
+    - CSRRSI: {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115,FUNC3_32: 6},             func: gen_csrrsi}
+    - CSRRCI: {format: I,  ext: RV32I, prefix: 32Bit, opcodes: {OP1_32: 115,FUNC3_32: 7},             func: gen_csrrci}
+
+    # RV64I
+    #- LWU     format: I  ext: RV64I prefix: 32Bit opcodes: (OP1_32:3,FUNC3:6}                 func: gen_lwu
+    #- LD      format: I  ext: RV64I prefix: 32Bit opcodes: (OP1_32:3,FUNC3:3}                 func: gen_ld
+    #- SD      format: S  ext: RV64I prefix: 32Bit opcodes: (OP1_32:35,FUNC3:3}                func: gen_sd

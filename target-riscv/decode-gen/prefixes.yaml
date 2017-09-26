@@ -1,0 +1,10 @@
+# Prefixes
+16Bit: {
+    bitmask: ~0b11,
+    len: 16
+    }
+
+32Bit: {
+    bitmask: 0b11,
+    len: 32
+    }
